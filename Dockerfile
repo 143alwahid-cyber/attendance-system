@@ -1,5 +1,5 @@
 # Use official PHP image with extensions for Laravel
-FROM php:8.2-fpm
+FROM php:8.4.15-fpm
 
 # Set working directory
 WORKDIR /var/www/html
