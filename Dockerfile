@@ -1,36 +1,25 @@
-# Use official PHP image with extensions for Laravel
-FROM php:8.4.15-fpm
+# Stage 0: Build stage
+FROM php:8.4-cli
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    zip unzip git curl libzip-dev libonig-dev libpng-dev libxml2-dev \
+    && docker-php-ext-install zip pdo_mysql mbstring exif pcntl bcmath gd
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Install dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    libpq-dev \
-    libzip-dev \
-    zip \
-    curl \
-    && docker-php-ext-install pdo pdo_pgsql zip
-
-# Install Composer
+# Copy composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy project
+# Copy project files
 COPY . .
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Generate key (can also be in build command on Render)
-RUN php artisan key:generate
+# Expose port 8080
+EXPOSE 8080
 
-# Cache config/routes/views
-RUN php artisan config:cache && php artisan route:cache && php artisan view:cache
-
-# Expose port for Render
-EXPOSE 10000
-
-# Start Laravel server
-CMD php artisan serve --host=0.0.0.0 --port=10000
+# Run Laravel built-in server
+CMD ["php", "-S", "0.0.0.0:8080", "-t", "public"]
