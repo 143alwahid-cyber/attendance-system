@@ -1,25 +1,23 @@
-# Stage 0: Build stage
-FROM php:8.4-cli
+FROM php:8.2-cli
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    zip unzip git curl libzip-dev libonig-dev libpng-dev libxml2-dev \
-    && docker-php-ext-install zip pdo_mysql mbstring exif pcntl bcmath gd
+    git unzip libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql
 
-# Set working directory
-WORKDIR /var/www/html
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+WORKDIR /var/www
 
-# Copy project files
+# Copy project
 COPY . .
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Expose port 8080
+# Expose port
 EXPOSE 8080
 
-# Run Laravel built-in server
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "public"]
+# Start Laravel
+CMD php -S 0.0.0.0:8080 -t public
