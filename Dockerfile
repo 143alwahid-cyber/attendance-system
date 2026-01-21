@@ -16,6 +16,8 @@ COPY . .
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
+#Migrate Database Tables
+RUN php artisan migrate
 # Expose port
 EXPOSE 8080
 
