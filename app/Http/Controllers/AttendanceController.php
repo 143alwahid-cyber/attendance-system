@@ -7,6 +7,7 @@ use App\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Smalot\PdfParser\Parser;
@@ -33,16 +34,21 @@ class AttendanceController extends Controller
         $file = $data['file'];
         $mimeType = $file->getMimeType();
         $extension = strtolower($file->getClientOriginalExtension());
+
+        // Load all employees once (keyed by employee_id) to avoid N+1 queries per record
+        $employeeMap = Employee::select('id', 'name', 'employee_id')
+            ->get()
+            ->keyBy(fn ($e) => (string) $e->employee_id);
         
         // Detect file type and parse accordingly
         if ($extension === 'csv' || $mimeType === 'text/csv' || $mimeType === 'application/csv') {
-            return $this->parseCsv($file);
+            return $this->parseCsv($file, $employeeMap);
         } else {
-            return $this->parsePdf($file, $parser);
+            return $this->parsePdf($file, $parser, $employeeMap);
         }
     }
     
-    private function parseCsv($file): View
+    private function parseCsv($file, Collection $employeeMap): View
     {
         try {
             $records = [];
@@ -167,8 +173,8 @@ class AttendanceController extends Controller
                     continue;
                 }
                 
-                // Find matching employee
-                $employee = Employee::where('employee_id', $employeeIdentifier)->first();
+                // Find matching employee (from preloaded map, no per-row query)
+                $employee = $employeeMap->get((string) $employeeIdentifier);
                 
                 // Check if checkin is late (after 10:00 AM)
                 $isLate = false;
@@ -211,7 +217,7 @@ class AttendanceController extends Controller
         }
     }
     
-    private function parsePdf($file, Parser $parser): View
+    private function parsePdf($file, Parser $parser, Collection $employeeMap): View
     {
         try {
             $pdf = $parser->parseFile($file->getRealPath());
@@ -393,8 +399,8 @@ class AttendanceController extends Controller
                     continue;
                 }
                 
-                // Find matching employee
-                $employee = Employee::where('employee_id', $employeeIdentifier)->first();
+                // Find matching employee (from preloaded map, no per-row query)
+                $employee = $employeeMap->get((string) $employeeIdentifier);
                 
                 // Check if checkin is late (after 10:00 AM)
                 $isLate = false;
@@ -450,31 +456,81 @@ class AttendanceController extends Controller
         $records = $preview['records'];
         $sourceFile = $preview['source_file'] ?? null;
 
-        $saved = 0;
-        $skipped = 0;
+        $skippedNoEmployee = 0;
+        $skippedDuplicate = 0;
+        $toInsert = [];
+
+        // Records with employee_id and their occurrence range for a single batched existence check
+        $withEmployee = array_values(array_filter($records, fn ($r) => ! empty($r['employee_id'])));
+        if (empty($withEmployee)) {
+            $empIds = [];
+            $minOccurred = $maxOccurred = null;
+        } else {
+            $empIds = array_unique(array_column($withEmployee, 'employee_id'));
+            $occurredList = array_column($withEmployee, 'occurred_at');
+            $minOccurred = min($occurredList);
+            $maxOccurred = max($occurredList);
+        }
+
+        // One query: load all potentially existing (employee_id, status, occurred_at) in range
+        $existingSet = [];
+        if (! empty($empIds) && $minOccurred && $maxOccurred) {
+            $existing = Attendance::whereIn('employee_id', $empIds)
+                ->whereBetween('occurred_at', [$minOccurred, $maxOccurred])
+                ->get(['employee_id', 'status', 'occurred_at']);
+            foreach ($existing as $r) {
+                $k = $r->employee_id . '|' . $r->status . '|' . Carbon::parse($r->occurred_at)->toDateTimeString();
+                $existingSet[$k] = true;
+            }
+        }
+
+        $now = now()->toDateTimeString();
 
         foreach ($records as $record) {
             if (! $record['employee_id']) {
-                $skipped++;
+                $skippedNoEmployee++;
                 continue;
             }
 
-            Attendance::create([
+            $occurredAt = Carbon::parse($record['occurred_at']);
+            $key = $record['employee_id'] . '|' . $record['status'] . '|' . $occurredAt->toDateTimeString();
+
+            if (isset($existingSet[$key])) {
+                $skippedDuplicate++;
+                continue;
+            }
+
+            $existingSet[$key] = true; // avoid inserting the same triple twice in this batch
+            $toInsert[] = [
                 'employee_id' => $record['employee_id'],
                 'status' => $record['status'],
-                'occurred_at' => Carbon::parse($record['occurred_at']),
+                'occurred_at' => $occurredAt->toDateTimeString(),
                 'source_file' => $sourceFile,
-                'raw_payload' => $record,
-            ]);
-            
-            $saved++;
+                'raw_payload' => json_encode($record),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        // Bulk insert in chunks (avoids N separate INSERTs)
+        $saved = 0;
+        foreach (array_chunk($toInsert, 100) as $chunk) {
+            Attendance::insert($chunk);
+            $saved += count($chunk);
         }
 
         Session::forget('attendance_preview');
 
         $message = "Saved {$saved} attendance record(s) to database.";
-        if ($skipped > 0) {
-            $message .= " Skipped {$skipped} record(s) with no matching employee.";
+        $skipParts = [];
+        if ($skippedNoEmployee > 0) {
+            $skipParts[] = "{$skippedNoEmployee} with no matching employee";
+        }
+        if ($skippedDuplicate > 0) {
+            $skipParts[] = "{$skippedDuplicate} already in the database (duplicates skipped)";
+        }
+        if (! empty($skipParts)) {
+            $message .= ' Skipped ' . implode(', ', $skipParts) . '.';
         }
 
         return redirect()

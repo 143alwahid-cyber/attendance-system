@@ -16,18 +16,18 @@ class DashboardController extends Controller
         $month = Carbon::parse($selectedMonth);
         $startDate = $month->copy()->startOfMonth();
         $endDate = $month->copy()->endOfMonth();
-        
-        // Total employees
-        $totalEmployees = Employee::count();
-        
-        // Calculate total absents for the selected month
-        $totalAbsents = $this->calculateAbsents($startDate, $endDate);
-        
-        // Get employees with attendance data and grades
+
+        // Load employees with attendances for the month in one go (avoids N+1)
         $employees = Employee::with(['attendances' => function ($query) use ($startDate, $endDate) {
             $query->whereBetween('occurred_at', [$startDate, $endDate]);
-        }])->get()->map(function ($employee) use ($startDate, $endDate) {
-            $attendanceStats = $this->calculateAttendanceStats($employee, $startDate, $endDate);
+        }])->get();
+
+        $totalEmployees = $employees->count();
+        $totalAbsents = $this->calculateAbsents($startDate, $endDate, $employees->pluck('id'));
+
+        // Use already-loaded attendances; no extra query per employee
+        $employees = $employees->map(function ($employee) use ($startDate, $endDate) {
+            $attendanceStats = $this->calculateAttendanceStats($employee, $startDate, $endDate, $employee->attendances);
             $grade = $this->calculateGrade($attendanceStats);
             
             return [
@@ -47,49 +47,56 @@ class DashboardController extends Controller
         return view('dashboard', compact('totalEmployees', 'totalAbsents', 'employees', 'selectedMonth'));
     }
     
-    private function calculateAbsents(Carbon $startDate, Carbon $endDate): int
+    private function calculateAbsents(Carbon $startDate, Carbon $endDate, $employeeIds): int
     {
-        // Get all working days in the month (excluding weekends)
-        $workingDays = 0;
         $absentDays = 0;
+
+        // Single query: all attendances in the date range (no per-day, per-employee queries)
+        $attendances = Attendance::whereBetween('occurred_at', [$startDate, $endDate])
+            ->select('employee_id', 'status', 'occurred_at')
+            ->get();
+
+        // Map: employee_id => date => ['checkin' => bool, 'checkout' => bool]
+        $byEmployeeDate = [];
+        foreach ($attendances as $a) {
+            $d = Carbon::parse($a->occurred_at)->format('Y-m-d');
+            $eid = $a->employee_id;
+            if (! isset($byEmployeeDate[$eid])) {
+                $byEmployeeDate[$eid] = [];
+            }
+            if (! isset($byEmployeeDate[$eid][$d])) {
+                $byEmployeeDate[$eid][$d] = ['checkin' => false, 'checkout' => false];
+            }
+            if ($a->status === 'checkin') {
+                $byEmployeeDate[$eid][$d]['checkin'] = true;
+            }
+            if ($a->status === 'checkout') {
+                $byEmployeeDate[$eid][$d]['checkout'] = true;
+            }
+        }
+
         $currentDate = $startDate->copy();
-        
         while ($currentDate <= $endDate) {
-            $dayOfWeek = $currentDate->dayOfWeek;
-            if ($dayOfWeek != Carbon::SATURDAY && $dayOfWeek != Carbon::SUNDAY) {
-                $workingDays++;
-                $dateKey = $currentDate->format('Y-m-d');
-                
-                // Get all employees
-                $employees = Employee::pluck('id');
-                
-                // Check if any employee has both checkin and checkout for this day
-                foreach ($employees as $employeeId) {
-                    $checkin = Attendance::where('employee_id', $employeeId)
-                        ->where('status', 'checkin')
-                        ->whereDate('occurred_at', $dateKey)
-                        ->exists();
-                    
-                    $checkout = Attendance::where('employee_id', $employeeId)
-                        ->where('status', 'checkout')
-                        ->whereDate('occurred_at', $dateKey)
-                        ->exists();
-                    
-                    // If both checkin and checkout are missing, it's an absent
-                    if (!$checkin && !$checkout) {
-                        $absentDays++;
-                    }
+            if ($currentDate->dayOfWeek === Carbon::SATURDAY || $currentDate->dayOfWeek === Carbon::SUNDAY) {
+                $currentDate->addDay();
+                continue;
+            }
+            $dateKey = $currentDate->format('Y-m-d');
+            foreach ($employeeIds as $eid) {
+                $flags = $byEmployeeDate[$eid][$dateKey] ?? ['checkin' => false, 'checkout' => false];
+                if (! $flags['checkin'] && ! $flags['checkout']) {
+                    $absentDays++;
                 }
             }
             $currentDate->addDay();
         }
-        
+
         return $absentDays;
     }
     
-    private function calculateAttendanceStats(Employee $employee, Carbon $startDate, Carbon $endDate): array
+    private function calculateAttendanceStats(Employee $employee, Carbon $startDate, Carbon $endDate, $attendancesForRange = null): array
     {
-        $attendances = Attendance::where('employee_id', $employee->id)
+        $attendances = $attendancesForRange ?? Attendance::where('employee_id', $employee->id)
             ->whereBetween('occurred_at', [$startDate, $endDate])
             ->get();
         

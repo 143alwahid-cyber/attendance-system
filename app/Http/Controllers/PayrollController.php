@@ -86,6 +86,78 @@ class PayrollController extends Controller
             ->with('error', 'PDF generation package is not installed. Please install barryvdh/laravel-dompdf package using: composer require barryvdh/laravel-dompdf');
     }
     
+    /**
+     * Calculate monthly tax based on Pakistan tax brackets
+     * Returns monthly tax amount in PKR
+     */
+    private function calculateTax(float $monthlySalary): float
+    {
+        // Tax brackets: [monthly_salary => monthly_tax]
+        $taxBrackets = [
+            50000 => 0,
+            55000 => 50,
+            60000 => 100,
+            70000 => 200,
+            80000 => 300,
+            90000 => 400,
+            100000 => 500,
+            120000 => 1533,
+            150000 => 3967,
+            200000 => 7967,
+            250000 => 17967,
+            300000 => 27167,
+            350000 => 33750,
+            400000 => 48333,
+            500000 => 81667,
+            750000 => 181667,
+            833333 => 216667,
+        ];
+
+        // If salary is below minimum bracket, no tax
+        if ($monthlySalary < 50000) {
+            return 0;
+        }
+
+        // Find the appropriate bracket
+        $prevBracket = null;
+        $prevTax = 0;
+        
+        foreach ($taxBrackets as $bracketSalary => $bracketTax) {
+            if ($monthlySalary == $bracketSalary) {
+                return $bracketTax;
+            }
+            
+            if ($monthlySalary < $bracketSalary) {
+                // Interpolate between previous and current bracket
+                if ($prevBracket !== null) {
+                    $salaryDiff = $monthlySalary - $prevBracket;
+                    $bracketDiff = $bracketSalary - $prevBracket;
+                    $taxDiff = $bracketTax - $prevTax;
+                    
+                    // Linear interpolation
+                    $interpolatedTax = $prevTax + (($salaryDiff / $bracketDiff) * $taxDiff);
+                    return round($interpolatedTax, 2);
+                }
+            }
+            
+            $prevBracket = $bracketSalary;
+            $prevTax = $bracketTax;
+        }
+
+        // If salary exceeds highest bracket, use highest bracket tax
+        // For salaries above 833,333, calculate based on highest bracket rate
+        if ($monthlySalary > 833333) {
+            // Extrapolate: use the rate from the last bracket
+            // Approximate: tax increases roughly proportionally
+            $highestBracket = 833333;
+            $highestTax = 216667;
+            $rate = $highestTax / $highestBracket;
+            return round($monthlySalary * $rate, 2);
+        }
+
+        return 0;
+    }
+
     private function calculatePayroll(Employee $employee, Carbon $month, float $overtimeMinutes = 0, float $compensation = 0): array
     {
         $startDate = $month->copy()->startOfMonth();
@@ -211,8 +283,11 @@ class PayrollController extends Controller
         // Calculate overtime: overtime_minutes × salary_per_minute × 1.5
         $overtimeAmount = $overtimeMinutes * $salaryPerMinute * 1.5;
         
-        // Calculate net salary: gross - deductions + overtime + compensation
-        $netSalary = $employee->salary - $totalDeductions + $overtimeAmount + $compensation;
+        // Calculate tax based on gross salary
+        $taxAmount = $this->calculateTax($employee->salary);
+        
+        // Calculate net salary: gross - deductions - tax + overtime + compensation
+        $netSalary = $employee->salary - $totalDeductions - $taxAmount + $overtimeAmount + $compensation;
         
         return [
             'gross_salary' => $employee->salary,
@@ -222,6 +297,7 @@ class PayrollController extends Controller
             'total_deductions' => $totalDeductions,
             'late_deductions' => $lateDeductions,
             'absent_deductions' => $absentDeductions,
+            'tax_amount' => $taxAmount,
             'overtime_minutes' => $overtimeMinutes,
             'overtime_amount' => $overtimeAmount,
             'compensation' => $compensation,

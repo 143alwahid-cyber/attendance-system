@@ -59,7 +59,7 @@
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
         <div class="bg-blue-50 rounded-lg shadow p-4">
             <div class="text-sm text-blue-600">Overtime</div>
             <div class="text-xs text-blue-500 mt-1">{{ number_format($payroll['overtime_minutes'], 0) }} minutes</div>
@@ -76,6 +76,10 @@
         <div class="bg-yellow-50 rounded-lg shadow p-4">
             <div class="text-sm text-yellow-600">Late Deductions</div>
             <div class="text-2xl font-bold text-yellow-700 mt-1">{{ number_format($payroll['late_deductions'], 2) }}</div>
+        </div>
+        <div class="bg-orange-50 rounded-lg shadow p-4">
+            <div class="text-sm text-orange-600">Tax Deduction</div>
+            <div class="text-2xl font-bold text-orange-700 mt-1">{{ number_format($payroll['tax_amount'], 2) }}</div>
         </div>
         <div class="bg-green-50 rounded-lg shadow p-4">
             <div class="text-sm text-green-600">Net Salary</div>
@@ -151,8 +155,16 @@
                 </tbody>
                 <tfoot class="bg-gray-50">
                     <tr>
-                        <td colspan="5" class="px-4 py-3 text-sm font-semibold text-gray-900 text-right">Total Deductions:</td>
+                        <td colspan="5" class="px-4 py-3 text-sm font-semibold text-gray-900 text-right">Attendance Deductions:</td>
                         <td class="px-4 py-3 text-sm font-bold text-red-600 text-right">-{{ number_format($payroll['total_deductions'], 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" class="px-4 py-3 text-sm font-semibold text-gray-900 text-right">Tax Deduction:</td>
+                        <td class="px-4 py-3 text-sm font-bold text-orange-600 text-right">-{{ number_format($payroll['tax_amount'], 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5" class="px-4 py-3 text-sm font-semibold text-gray-900 text-right">Total Deductions:</td>
+                        <td class="px-4 py-3 text-sm font-bold text-red-600 text-right">-{{ number_format($payroll['total_deductions'] + $payroll['tax_amount'], 2) }}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -166,8 +178,9 @@
             <li>Salary per minute = Salary ÷ 22 days ÷ 9 hours ÷ 60 minutes = {{ number_format($payroll['salary_per_minute'], 4) }}</li>
             <li>Late check-in deduction = 60 minutes (base) + actual late minutes × salary per minute</li>
             <li>Absent deduction = 1.5 × daily salary (applied when BOTH check-in AND check-out are missing)</li>
+            <li>Tax deduction = Calculated based on monthly salary according to Pakistan tax brackets</li>
             <li>Overtime = Overtime minutes × salary per minute × 1.5</li>
-            <li>Net Salary = Gross Salary - Deductions + Overtime + Compensation</li>
+            <li>Net Salary = Gross Salary - Attendance Deductions - Tax + Overtime + Compensation</li>
             <li>Working days exclude weekends (Saturday & Sunday)</li>
         </ul>
     </div>

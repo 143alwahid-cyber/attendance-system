@@ -394,7 +394,13 @@
                     <td class="text-right">{{ number_format($payroll['late_deductions'], 2) }}</td>
                 </tr>
                 @endif
-                @if ($payroll['absent_deductions'] == 0 && $payroll['late_deductions'] == 0)
+                @if ($payroll['tax_amount'] > 0)
+                <tr>
+                    <td>Tax Deduction</td>
+                    <td class="text-right">{{ number_format($payroll['tax_amount'], 2) }}</td>
+                </tr>
+                @endif
+                @if ($payroll['absent_deductions'] == 0 && $payroll['late_deductions'] == 0 && $payroll['tax_amount'] == 0)
                 <tr>
                     <td>No Deductions</td>
                     <td class="text-right">0.00</td>
@@ -404,7 +410,7 @@
             <tfoot>
                 <tr>
                     <td>Total Deductions</td>
-                    <td class="text-right">{{ number_format($payroll['total_deductions'], 2) }}</td>
+                    <td class="text-right">{{ number_format($payroll['total_deductions'] + $payroll['tax_amount'], 2) }}</td>
                 </tr>
             </tfoot>
         </table>
