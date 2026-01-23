@@ -178,6 +178,9 @@
     tbody tr.late {
         background: #fffbeb;
     }
+    tbody tr.leave {
+        background: #eff6ff;
+    }
     td {
         padding: 10px 8px;
         color: #1a1a1a;
@@ -204,6 +207,10 @@
     .badge-present {
         background: #d1fae5;
         color: #065f46;
+    }
+    .badge-leave {
+        background: #dbeafe;
+        color: #1e40af;
     }
     tfoot {
         background: #f3f4f6;
@@ -341,18 +348,33 @@
         </thead>
         <tbody>
             @foreach ($payroll['daily_details'] as $day)
-                <tr class="{{ $day['is_absent'] ? 'absent' : ($day['is_late'] ? 'late' : '') }}">
+                <tr class="{{ isset($day['has_leave']) && $day['has_leave'] ? 'leave' : ($day['is_absent'] ? 'absent' : ($day['is_late'] ? 'late' : '')) }}">
                     <td>{{ $day['date_formatted'] }}</td>
                     <td>{{ $day['day_name'] }}</td>
                     <td>
-                        {{ $day['checkin'] ?? '—' }}
-                        @if ($day['is_late'] && $day['checkin'])
-                            <span class="badge badge-late">Late ({{ $day['late_minutes'] }}m)</span>
+                        @if (isset($day['has_leave']) && $day['has_leave'])
+                            <span style="color: #2563eb;">—</span>
+                        @else
+                            {{ $day['checkin'] ?? '—' }}
+                            @if ($day['is_late'] && $day['checkin'])
+                                <span class="badge badge-late">Late ({{ $day['late_minutes'] }}m)</span>
+                            @endif
                         @endif
                     </td>
-                    <td>{{ $day['checkout'] ?? '—' }}</td>
                     <td>
-                        @if ($day['is_absent'])
+                        @if (isset($day['has_leave']) && $day['has_leave'])
+                            <span style="color: #2563eb;">—</span>
+                        @else
+                            {{ $day['checkout'] ?? '—' }}
+                        @endif
+                    </td>
+                    <td>
+                        @if (isset($day['has_leave']) && $day['has_leave'])
+                            <span class="badge badge-leave">Leave ({{ ucfirst($day['leave_type'] ?? 'full_day') }})</span>
+                            @if (isset($day['leave_format']))
+                                <div style="font-size: 9px; color: #2563eb; margin-top: 2px;">{{ ucfirst($day['leave_format']) }}</div>
+                            @endif
+                        @elseif ($day['is_absent'])
                             <span class="badge badge-absent">Absent</span>
                         @elseif ($day['is_late'])
                             <span class="badge badge-late">Late</span>

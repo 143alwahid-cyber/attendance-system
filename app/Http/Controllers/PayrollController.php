@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Employee;
 use App\Models\Attendance;
 use App\Models\Payroll as PayrollModel;
+use App\Models\Leave;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -170,6 +171,15 @@ class PayrollController extends Controller
             ->orderBy('occurred_at')
             ->get();
         
+        // Get all approved leaves for the month
+        $approvedLeaves = Leave::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereBetween('leave_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->get()
+            ->keyBy(function ($leave) {
+                return $leave->leave_date->format('Y-m-d');
+            });
+        
         // Calculate salary per minute: Salary / 22 / 9 / 60
         $salaryPerMinute = $employee->salary / 22 / 9 / 60;
         $salaryPerDay = $employee->salary / 22;
@@ -223,19 +233,25 @@ class PayrollController extends Controller
             $checkin = $attendanceByDate[$dateKey]['checkin'] ?? null;
             $checkout = $attendanceByDate[$dateKey]['checkout'] ?? null;
             
+            // Check if there's an approved leave for this date
+            $approvedLeave = $approvedLeaves->get($dateKey);
+            $hasFullDayLeave = $approvedLeave && $approvedLeave->leave_type === 'full_day';
+            $hasHalfDayLeave = $approvedLeave && $approvedLeave->leave_type === 'half_day';
+            $leaveFormat = $approvedLeave ? $approvedLeave->leave_format : null;
+            
             $dayDeduction = 0;
             $isAbsent = false;
             $isLate = false;
             $lateMinutes = 0;
             
-            // Check if absent (BOTH checkin AND checkout are missing)
-            if (!$checkin && !$checkout) {
-                $isAbsent = true;
-                // Absent deduction = per day salary × 1.5
-                $dayDeduction = $salaryPerDay * 1.5;
-                $absentDeductions += $dayDeduction;
-            } else {
-                // Only check for late if checkin exists
+            // If there's a full day approved leave, no deductions at all
+            if ($hasFullDayLeave) {
+                // Full day leave: no absent deduction, no late deduction
+                $isAbsent = false;
+                $isLate = false;
+            } elseif ($hasHalfDayLeave) {
+                // Half day leave: no absent deduction, but can still have late deduction if they came late
+                // Only check for late if checkin exists and they came late
                 if ($checkin) {
                     $checkinHour = (int) $checkin->format('H');
                     $checkinMinute = (int) $checkin->format('i');
@@ -262,6 +278,45 @@ class PayrollController extends Controller
                         $lateDeductions += $dayDeduction;
                     }
                 }
+                // No absent deduction for half day leave
+                $isAbsent = false;
+            } else {
+                // No approved leave: normal attendance logic
+                // Check if absent (BOTH checkin AND checkout are missing)
+                if (!$checkin && !$checkout) {
+                    $isAbsent = true;
+                    // Absent deduction = per day salary × 1.5
+                    $dayDeduction = $salaryPerDay * 1.5;
+                    $absentDeductions += $dayDeduction;
+                } else {
+                    // Only check for late if checkin exists
+                    if ($checkin) {
+                        $checkinHour = (int) $checkin->format('H');
+                        $checkinMinute = (int) $checkin->format('i');
+                        
+                        // Check if checkin is after 10:00 AM
+                        if ($checkinHour > 10 || ($checkinHour == 10 && $checkinMinute > 0)) {
+                            $isLate = true;
+                            
+                            // Calculate late minutes: actual checkin time - 10:00 AM
+                            $expectedHour = 10;
+                            $expectedMinute = 0;
+                            
+                            // Convert to total minutes since midnight
+                            $checkinTotalMinutes = ($checkinHour * 60) + $checkinMinute;
+                            $expectedTotalMinutes = ($expectedHour * 60) + $expectedMinute;
+                            
+                            // Calculate late minutes
+                            $lateMinutes = $checkinTotalMinutes - $expectedTotalMinutes;
+                            
+                            // Late deduction: 60 mins base + actual late minutes
+                            // Example: 10:02 AM = 2 min late, so 60 + 2 = 62 minutes deduction
+                            $lateDeductionMinutes = 60 + $lateMinutes;
+                            $dayDeduction = $salaryPerMinute * $lateDeductionMinutes;
+                            $lateDeductions += $dayDeduction;
+                        }
+                    }
+                }
             }
             
             $totalDeductions += $dayDeduction;
@@ -276,6 +331,9 @@ class PayrollController extends Controller
                 'is_late' => $isLate,
                 'late_minutes' => $lateMinutes,
                 'deduction' => $dayDeduction,
+                'has_leave' => $approvedLeave !== null,
+                'leave_type' => $approvedLeave ? $approvedLeave->leave_type : null,
+                'leave_format' => $leaveFormat,
             ];
             
             $currentDate->addDay();

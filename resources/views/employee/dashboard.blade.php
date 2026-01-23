@@ -228,9 +228,10 @@
                             // Apply status filter
                             $shouldDisplay = true;
                             if ($statusFilter !== 'all' && !$isWeekend) {
-                                if ($statusFilter === 'present' && (!$dayAttendance || (!$dayAttendance['checkin'] && !$dayAttendance['checkout']))) {
+                                $hasLeave = isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'];
+                                if ($statusFilter === 'present' && !$hasLeave && (!$dayAttendance || (!$dayAttendance['checkin'] && !$dayAttendance['checkout']))) {
                                     $shouldDisplay = false;
-                                } elseif ($statusFilter === 'absent' && $dayAttendance && ($dayAttendance['checkin'] || $dayAttendance['checkout'])) {
+                                } elseif ($statusFilter === 'absent' && !$hasLeave && $dayAttendance && ($dayAttendance['checkin'] || $dayAttendance['checkout'])) {
                                     $shouldDisplay = false;
                                 } elseif ($statusFilter === 'late' && (!$dayAttendance || !$dayAttendance['late'])) {
                                     $shouldDisplay = false;
@@ -245,7 +246,14 @@
                                     <div class="text-xs text-gray-500">{{ $currentDate->format('l') }}</div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    @if($dayAttendance && ($dayAttendance['checkin'] || $dayAttendance['checkout']))
+                                    @if(isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'])
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            Leave ({{ ucfirst($dayAttendance['leave_type'] ?? 'full_day') }})
+                                        </span>
+                                        @if(isset($dayAttendance['leave_format']))
+                                            <div class="text-xs text-gray-500 mt-1">{{ ucfirst($dayAttendance['leave_format']) }}</div>
+                                        @endif
+                                    @elseif($dayAttendance && ($dayAttendance['checkin'] || $dayAttendance['checkout']))
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             Present
                                         </span>
@@ -279,7 +287,9 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    @if($dayAttendance && $dayAttendance['late'])
+                                    @if(isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'])
+                                        <span class="text-xs text-blue-600">Approved Leave</span>
+                                    @elseif($dayAttendance && $dayAttendance['late'])
                                         <span class="text-xs text-yellow-600">Late arrival</span>
                                     @elseif(!$dayAttendance || (!$dayAttendance['checkin'] && !$dayAttendance['checkout']))
                                         <span class="text-xs text-red-600">No attendance</span>

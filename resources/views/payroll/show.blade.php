@@ -136,11 +136,13 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach ($payroll['daily_details'] as $day)
-                        <tr class="{{ $day['is_absent'] ? 'bg-red-50' : ($day['is_late'] ? 'bg-yellow-50' : '') }}">
+                        <tr class="{{ $day['has_leave'] ?? false ? 'bg-blue-50' : ($day['is_absent'] ? 'bg-red-50' : ($day['is_late'] ? 'bg-yellow-50' : '')) }}">
                             <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $day['date_formatted'] }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $day['day_name'] }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">
-                                @if ($day['checkin'])
+                                @if (isset($day['has_leave']) && $day['has_leave'])
+                                    <span class="text-blue-600">—</span>
+                                @elseif ($day['checkin'])
                                     {{ $day['checkin'] }}
                                     @if ($day['is_late'])
                                         <span class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
@@ -152,14 +154,23 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700">
-                                @if ($day['checkout'])
+                                @if (isset($day['has_leave']) && $day['has_leave'])
+                                    <span class="text-blue-600">—</span>
+                                @elseif ($day['checkout'])
                                     {{ $day['checkout'] }}
                                 @else
                                     <span class="text-red-600">—</span>
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-sm">
-                                @if ($day['is_absent'])
+                                @if (isset($day['has_leave']) && $day['has_leave'])
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
+                                        Leave ({{ ucfirst($day['leave_type'] ?? 'full_day') }})
+                                    </span>
+                                    @if (isset($day['leave_format']))
+                                        <div class="text-xs text-blue-600 mt-1">{{ ucfirst($day['leave_format']) }}</div>
+                                    @endif
+                                @elseif ($day['is_absent'])
                                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800">
                                         Absent
                                     </span>

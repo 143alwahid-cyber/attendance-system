@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\Leave;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,8 +38,16 @@ class EmployeeDashboardController extends Controller
             ->orderBy('occurred_at', $sortOrder)
             ->get();
 
+        // Get all leaves for this employee in the date range
+        $leaves = Leave::where('employee_id', $employee->id)
+            ->whereBetween('leave_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->get()
+            ->keyBy(function ($leave) {
+                return $leave->leave_date->format('Y-m-d');
+            });
+
         // Calculate stats (always calculate for full date range, filtering happens in view)
-        $attendanceStats = $this->calculateAttendanceStats($employee, $startDate, $endDate, $attendances);
+        $attendanceStats = $this->calculateAttendanceStats($employee, $startDate, $endDate, $attendances, $leaves);
         $grade = $this->calculateGrade($attendanceStats);
 
         return view('employee.dashboard', compact(
@@ -54,7 +63,7 @@ class EmployeeDashboardController extends Controller
         ));
     }
 
-    private function calculateAttendanceStats($employee, Carbon $startDate, Carbon $endDate, $attendances): array
+    private function calculateAttendanceStats($employee, Carbon $startDate, Carbon $endDate, $attendances, $leaves = null): array
     {
         // Calculate working days
         $workingDays = 0;
@@ -106,8 +115,30 @@ class EmployeeDashboardController extends Controller
             if ($dayOfWeek != Carbon::SATURDAY && $dayOfWeek != Carbon::SUNDAY) {
                 $dateKey = $currentDate->format('Y-m-d');
                 $dayAttendance = $attendanceByDate[$dateKey] ?? ['checkin' => false, 'checkout' => false, 'late' => false];
-
-                if ($dayAttendance['checkin'] || $dayAttendance['checkout']) {
+                
+                // Check if there's an approved leave for this date
+                $approvedLeave = $leaves ? $leaves->get($dateKey) : null;
+                $hasApprovedLeave = $approvedLeave && $approvedLeave->status === 'approved';
+                
+                if ($hasApprovedLeave) {
+                    // If there's an approved leave, mark it in attendance data
+                    if (!isset($attendanceByDate[$dateKey])) {
+                        $attendanceByDate[$dateKey] = [
+                            'checkin' => false,
+                            'checkout' => false,
+                            'late' => false,
+                            'checkin_time' => null,
+                            'checkout_time' => null,
+                        ];
+                    }
+                    $attendanceByDate[$dateKey]['has_leave'] = true;
+                    $attendanceByDate[$dateKey]['leave_type'] = $approvedLeave->leave_type;
+                    $attendanceByDate[$dateKey]['leave_format'] = $approvedLeave->leave_format;
+                    $attendanceByDate[$dateKey]['leave_status'] = $approvedLeave->status;
+                    
+                    // Approved leave counts as present (not absent)
+                    $presentDays++;
+                } elseif ($dayAttendance['checkin'] || $dayAttendance['checkout']) {
                     $presentDays++;
                     if ($dayAttendance['late']) {
                         $lateDays++;
