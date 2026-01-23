@@ -5,16 +5,66 @@
 
 @section('content')
 <div class="max-w-7xl mx-auto space-y-6">
-    <!-- Welcome Section -->
-    <div class="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl shadow-lg p-6 text-white">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold mb-1">Welcome, {{ $employee->name }}!</h1>
-                <p class="text-indigo-200 text-sm">Employee ID: <span class="font-mono">{{ 'DEVNO-' . $employee->employee_id }}</span></p>
+    <!-- Welcome Section with Weather -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Welcome Card -->
+        <div class="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold mb-1">Welcome, {{ $employee->name }}!</h1>
+                    <p class="text-indigo-200 text-sm">Employee ID: <span class="font-mono">{{ 'DEVNO-' . $employee->employee_id }}</span></p>
+                </div>
+                <div class="text-right">
+                    <p class="text-indigo-200 text-sm">Current Month</p>
+                    <p class="text-2xl font-bold">{{ date('F Y', strtotime($selectedMonth)) }}</p>
+                </div>
             </div>
-            <div class="text-right">
-                <p class="text-indigo-200 text-sm">Current Month</p>
-                <p class="text-2xl font-bold">{{ date('F Y', strtotime($selectedMonth)) }}</p>
+            <div class="flex items-center space-x-4 text-indigo-100 mt-4">
+                <div class="flex items-center space-x-2 bg-white bg-opacity-10 rounded-lg px-3 py-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span id="current-date" class="text-sm font-medium"></span>
+                </div>
+                <div class="flex items-center space-x-2 bg-white bg-opacity-10 rounded-lg px-3 py-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span id="current-time" class="text-sm font-medium"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weather Widget -->
+        <div class="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl shadow-lg p-6 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-10 rounded-full"></div>
+            <div class="absolute bottom-0 left-0 -mb-4 -ml-4 w-32 h-32 bg-white opacity-10 rounded-full"></div>
+            <div class="relative z-10">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <p class="text-blue-100 text-sm font-medium mb-1" id="weather-city">Loading...</p>
+                        <div class="flex items-center space-x-2">
+                            <span id="weather-temp" class="text-4xl font-bold">--</span>
+                            <span class="text-2xl text-blue-100">°C</span>
+                        </div>
+                    </div>
+                    <div id="weather-icon" class="text-6xl">🌤️</div>
+                </div>
+                <div class="flex items-center space-x-4 text-sm text-blue-100">
+                    <div class="flex items-center space-x-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                        </svg>
+                        <span id="weather-humidity">--%</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span id="weather-wind">-- km/h</span>
+                    </div>
+                </div>
+                <p id="weather-description" class="text-blue-100 text-sm mt-2 capitalize">--</p>
             </div>
         </div>
     </div>
@@ -42,8 +92,8 @@
         </div>
     </div>
 
-    <!-- Attendance Rate and Grade -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Attendance Rate, Grade, and Leaves Card -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
@@ -84,6 +134,41 @@
                     @endif
                 </div>
             </div>
+        </div>
+
+        <!-- Leaves Card -->
+        <div class="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-gray-600 text-sm font-medium mb-1">My Leaves</p>
+                    <p class="text-3xl font-bold text-gray-900">{{ $leaveStats['total'] }}</p>
+                </div>
+                <div class="bg-purple-100 rounded-full p-4">
+                    <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+                <div class="text-center">
+                    <p class="text-gray-500">Pending</p>
+                    <p class="text-lg font-semibold text-yellow-600">{{ $leaveStats['pending'] }}</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-gray-500">Approved</p>
+                    <p class="text-lg font-semibold text-green-600">{{ $leaveStats['approved'] }}</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-gray-500">Days</p>
+                    <p class="text-lg font-semibold text-purple-600">{{ number_format($leaveStats['total_days'], 1) }}</p>
+                </div>
+            </div>
+            <a 
+                href="{{ route('employee.leaves.index') }}" 
+                class="mt-4 block text-center text-sm text-purple-600 hover:text-purple-800 font-medium"
+            >
+                View All Leaves →
+            </a>
         </div>
     </div>
 
@@ -321,4 +406,61 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Update Date and Time
+    function updateDateTime() {
+        const now = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', options);
+        document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+    
+    // Weather Widget - Using backend API to avoid CORS issues
+    async function fetchWeather() {
+        try {
+            const response = await fetch('/api/weather?city=Lahore');
+            const data = await response.json();
+            
+            document.getElementById('weather-city').textContent = data.city;
+            document.getElementById('weather-temp').textContent = data.temp;
+            document.getElementById('weather-humidity').textContent = data.humidity + '%';
+            document.getElementById('weather-wind').textContent = data.wind + ' km/h';
+            document.getElementById('weather-description').textContent = data.description;
+            
+            // Set weather icon based on condition code
+            const weatherCode = data.weatherCode;
+            const iconMap = {
+                '113': '☀️', '116': '⛅', '119': '☁️', '122': '☁️', '143': '🌫️',
+                '176': '🌦️', '179': '🌨️', '182': '🌨️', '185': '🌨️', '200': '⛈️',
+                '227': '🌨️', '230': '🌨️', '248': '🌫️', '260': '🌫️', '263': '🌦️',
+                '266': '🌦️', '281': '🌨️', '284': '🌨️', '293': '🌦️', '296': '🌦️',
+                '299': '🌧️', '302': '🌧️', '305': '🌧️', '308': '🌧️', '311': '🌨️',
+                '314': '🌨️', '317': '🌨️', '320': '🌨️', '323': '🌨️', '326': '🌨️',
+                '329': '🌨️', '332': '🌨️', '335': '🌨️', '338': '🌨️', '350': '🌨️',
+                '353': '🌦️', '356': '🌧️', '359': '🌧️', '362': '🌨️', '365': '🌨️',
+                '368': '🌨️', '371': '🌨️', '374': '🌨️', '377': '🌨️', '386': '⛈️',
+                '389': '⛈️', '392': '⛈️', '395': '⛈️'
+            };
+            document.getElementById('weather-icon').textContent = iconMap[weatherCode] || '🌤️';
+        } catch (error) {
+            console.error('Weather fetch error:', error);
+            // Fallback display
+            document.getElementById('weather-city').textContent = 'Lahore, PK';
+            document.getElementById('weather-temp').textContent = '22';
+            document.getElementById('weather-humidity').textContent = '60%';
+            document.getElementById('weather-wind').textContent = '10 km/h';
+            document.getElementById('weather-description').textContent = 'Partly Cloudy';
+            document.getElementById('weather-icon').textContent = '🌤️';
+        }
+    }
+    
+    // Fetch weather on page load
+    fetchWeather();
+    
+    // Update weather every 30 minutes
+    setInterval(fetchWeather, 30 * 60 * 1000);
+</script>
 @endsection

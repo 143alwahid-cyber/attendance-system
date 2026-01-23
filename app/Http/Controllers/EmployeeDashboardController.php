@@ -50,6 +50,17 @@ class EmployeeDashboardController extends Controller
         $attendanceStats = $this->calculateAttendanceStats($employee, $startDate, $endDate, $attendances, $leaves);
         $grade = $this->calculateGrade($attendanceStats);
 
+        // Calculate leave statistics
+        $leaveStats = [
+            'total' => Leave::where('employee_id', $employee->id)->count(),
+            'pending' => Leave::where('employee_id', $employee->id)->where('status', 'pending')->count(),
+            'approved' => Leave::where('employee_id', $employee->id)->where('status', 'approved')->count(),
+            'rejected' => Leave::where('employee_id', $employee->id)->where('status', 'rejected')->count(),
+            'total_days' => Leave::where('employee_id', $employee->id)
+                ->where('status', 'approved')
+                ->sum('number_of_days'),
+        ];
+
         return view('employee.dashboard', compact(
             'employee',
             'attendances',
@@ -59,7 +70,8 @@ class EmployeeDashboardController extends Controller
             'statusFilter',
             'dateFrom',
             'dateTo',
-            'sortOrder'
+            'sortOrder',
+            'leaveStats'
         ));
     }
 

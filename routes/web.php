@@ -112,6 +112,10 @@ Route::middleware('auth:employee')->group(function () {
 
     Route::post('/employee/leaves', [LeaveController::class, 'store'])
         ->name('employee.leaves.store');
+
+    // Weather API for employees
+    Route::get('/api/weather', [WeatherController::class, 'getWeather'])
+        ->name('weather.get');
 });
 
 // Common logout route (works for both admin and employee)
