@@ -32,11 +32,19 @@ class EmployeeController extends Controller
             'salary' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
         ]);
 
-        Employee::create($data);
+        // Set default password
+        $data['password'] = \Illuminate\Support\Facades\Hash::make('Lifeatdevno@2026');
+        
+        // Create employee and get the ID
+        $employee = Employee::create($data);
+        
+        // Set login_identifier after creation (using the employee_id column value)
+        $employee->login_identifier = 'DEVNO-' . $employee->employee_id;
+        $employee->save();
 
         return redirect()
             ->route('employees.index')
-            ->with('status', 'Employee created successfully.');
+            ->with('status', 'Employee created successfully with default password: Lifeatdevno@2026');
     }
 
     public function edit(Employee $employee): View

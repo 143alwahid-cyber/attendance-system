@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employee;
 use App\Models\Attendance;
+use App\Models\Payroll as PayrollModel;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -305,5 +306,220 @@ class PayrollController extends Controller
             'daily_details' => $dailyDetails,
             'month_formatted' => $month->format('F Y'),
         ];
+    }
+
+    /**
+     * Save a generated payroll to the database.
+     */
+    public function savePayroll(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'],
+            'month' => ['required', 'date_format:Y-m'],
+            'overtime_minutes' => ['nullable', 'numeric', 'min:0'],
+            'compensation' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $employee = Employee::findOrFail($request->employee_id);
+        $month = Carbon::parse($request->month);
+        $overtimeMinutes = (float) ($request->input('overtime_minutes', 0));
+        $compensation = (float) ($request->input('compensation', 0));
+
+        $payroll = $this->calculatePayroll($employee, $month, $overtimeMinutes, $compensation);
+
+        // Check if payroll already exists for this employee and month
+        $existingPayroll = PayrollModel::where('employee_id', $employee->id)
+            ->where('payroll_month', $month->copy()->startOfMonth())
+            ->first();
+
+        if ($existingPayroll) {
+            // Update existing payroll
+            $existingPayroll->update([
+                'gross_salary' => $payroll['gross_salary'],
+                'working_days' => $payroll['working_days'],
+                'salary_per_day' => $payroll['salary_per_day'],
+                'salary_per_minute' => $payroll['salary_per_minute'],
+                'total_deductions' => $payroll['total_deductions'],
+                'late_deductions' => $payroll['late_deductions'],
+                'absent_deductions' => $payroll['absent_deductions'],
+                'tax_amount' => $payroll['tax_amount'],
+                'overtime_minutes' => $payroll['overtime_minutes'],
+                'overtime_amount' => $payroll['overtime_amount'],
+                'compensation' => $payroll['compensation'],
+                'net_salary' => $payroll['net_salary'],
+                'daily_details' => $payroll['daily_details'],
+            ]);
+
+            return redirect()
+                ->route('payroll.saved')
+                ->with('status', 'Payroll updated successfully for ' . $employee->name . ' - ' . $payroll['month_formatted']);
+        }
+
+        // Create new payroll
+        PayrollModel::create([
+            'employee_id' => $employee->id,
+            'payroll_month' => $month->copy()->startOfMonth(),
+            'gross_salary' => $payroll['gross_salary'],
+            'working_days' => $payroll['working_days'],
+            'salary_per_day' => $payroll['salary_per_day'],
+            'salary_per_minute' => $payroll['salary_per_minute'],
+            'total_deductions' => $payroll['total_deductions'],
+            'late_deductions' => $payroll['late_deductions'],
+            'absent_deductions' => $payroll['absent_deductions'],
+            'tax_amount' => $payroll['tax_amount'],
+            'overtime_minutes' => $payroll['overtime_minutes'],
+            'overtime_amount' => $payroll['overtime_amount'],
+            'compensation' => $payroll['compensation'],
+            'net_salary' => $payroll['net_salary'],
+            'daily_details' => $payroll['daily_details'],
+        ]);
+
+        return redirect()
+            ->route('payroll.saved')
+            ->with('status', 'Payroll saved successfully for ' . $employee->name . ' - ' . $payroll['month_formatted']);
+    }
+
+    /**
+     * Display all saved payrolls (Admin view).
+     */
+    public function savedPayrolls(Request $request): View
+    {
+        $query = PayrollModel::with('employee')->orderBy('payroll_month', 'desc')->orderBy('created_at', 'desc');
+
+        // Filter by employee
+        if ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->employee_id);
+        }
+
+        // Filter by month
+        if ($request->filled('month')) {
+            $month = Carbon::parse($request->month)->startOfMonth();
+            $query->where('payroll_month', $month);
+        }
+
+        // Filter by date range
+        if ($request->filled('date_from')) {
+            $query->where('payroll_month', '>=', Carbon::parse($request->date_from)->startOfMonth());
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('payroll_month', '<=', Carbon::parse($request->date_to)->startOfMonth());
+        }
+
+        $payrolls = $query->paginate(20)->withQueryString();
+        $employees = Employee::orderBy('name')->get();
+
+        return view('payroll.saved', compact('payrolls', 'employees'));
+    }
+
+    /**
+     * Display employee's saved payrolls (Employee view).
+     */
+    public function employeePayrolls(Request $request): View
+    {
+        $employee = auth('employee')->user();
+
+        $query = PayrollModel::where('employee_id', $employee->id)
+            ->orderBy('payroll_month', 'desc')
+            ->orderBy('created_at', 'desc');
+
+        // Filter by month
+        if ($request->filled('month')) {
+            $month = Carbon::parse($request->month)->startOfMonth();
+            $query->where('payroll_month', $month);
+        }
+
+        // Filter by date range
+        if ($request->filled('date_from')) {
+            $query->where('payroll_month', '>=', Carbon::parse($request->date_from)->startOfMonth());
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('payroll_month', '<=', Carbon::parse($request->date_to)->startOfMonth());
+        }
+
+        $payrolls = $query->paginate(20)->withQueryString();
+
+        return view('payroll.employee-list', compact('payrolls', 'employee'));
+    }
+
+    /**
+     * Download a saved payroll as PDF.
+     */
+    public function downloadSavedPayroll(PayrollModel $payroll)
+    {
+        $employee = $payroll->employee;
+        $month = Carbon::parse($payroll->payroll_month);
+
+        // Convert saved payroll data to the format expected by the PDF view
+        $payrollData = [
+            'gross_salary' => $payroll->gross_salary,
+            'working_days' => $payroll->working_days,
+            'salary_per_day' => $payroll->salary_per_day,
+            'salary_per_minute' => $payroll->salary_per_minute,
+            'total_deductions' => $payroll->total_deductions,
+            'late_deductions' => $payroll->late_deductions,
+            'absent_deductions' => $payroll->absent_deductions,
+            'tax_amount' => $payroll->tax_amount,
+            'overtime_minutes' => $payroll->overtime_minutes,
+            'overtime_amount' => $payroll->overtime_amount,
+            'compensation' => $payroll->compensation,
+            'net_salary' => $payroll->net_salary,
+            'daily_details' => $payroll->daily_details,
+            'month_formatted' => $month->format('F Y'),
+        ];
+
+        // Use dompdf for backend PDF generation
+        if (class_exists('\Barryvdh\DomPDF\Facade\Pdf')) {
+            try {
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('payroll.pdf', [
+                    'employee' => $employee,
+                    'month' => $month,
+                    'payroll' => $payrollData
+                ])
+                    ->setPaper('a4', 'portrait')
+                    ->setOption('enable-local-file-access', true)
+                    ->setOption('isRemoteEnabled', true);
+
+                $fileName = 'Payroll_' . $employee->employee_id . '_' . $month->format('Y-m') . '.pdf';
+
+                return $pdf->download($fileName);
+            } catch (\Exception $e) {
+                \Log::error('PDF generation error: ' . $e->getMessage());
+                return back()->with('error', 'PDF generation failed: ' . $e->getMessage());
+            }
+        }
+
+        return back()->with('error', 'PDF generation package is not installed.');
+    }
+
+    /**
+     * View a saved payroll (Admin view).
+     */
+    public function viewSavedPayroll(PayrollModel $payroll): View
+    {
+        $employee = $payroll->employee;
+        $month = Carbon::parse($payroll->payroll_month);
+        $savedPayroll = $payroll; // Keep the model instance
+
+        // Convert saved payroll data to the format expected by the view
+        $payroll = [
+            'gross_salary' => $savedPayroll->gross_salary,
+            'working_days' => $savedPayroll->working_days,
+            'salary_per_day' => $savedPayroll->salary_per_day,
+            'salary_per_minute' => $savedPayroll->salary_per_minute,
+            'total_deductions' => $savedPayroll->total_deductions,
+            'late_deductions' => $savedPayroll->late_deductions,
+            'absent_deductions' => $savedPayroll->absent_deductions,
+            'tax_amount' => $savedPayroll->tax_amount,
+            'overtime_minutes' => $savedPayroll->overtime_minutes,
+            'overtime_amount' => $savedPayroll->overtime_amount,
+            'compensation' => $savedPayroll->compensation,
+            'net_salary' => $savedPayroll->net_salary,
+            'daily_details' => $savedPayroll->daily_details,
+            'month_formatted' => $month->format('F Y'),
+        ];
+
+        return view('payroll.show', compact('employee', 'month', 'payroll', 'savedPayroll'));
     }
 }

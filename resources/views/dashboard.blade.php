@@ -39,7 +39,7 @@
                             <span class="waving-hand text-4xl ml-2">👋</span>
                         </div>
                         <div>
-                            <h1 class="text-3xl font-bold mb-1">Welcome back, {{ auth()->user()->name }}!</h1>
+                            <h1 class="text-3xl font-bold mb-1">Welcome back, {{ auth('web')->user()->name }}!</h1>
                             <p class="text-indigo-200 text-sm">Have a productive day! ✨</p>
                         </div>
                     </div>

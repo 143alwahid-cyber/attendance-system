@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login</title>
+    <title>Admin Login - DevnoSol</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4">
@@ -25,9 +25,9 @@
         </div>
 
         <div class="bg-white/90 backdrop-blur shadow-xl rounded-2xl p-8 border border-gray-100">
-            <h1 class="text-xl font-semibold text-gray-900 mb-2 text-center">Sign in to your account</h1>
+            <h1 class="text-xl font-semibold text-gray-900 mb-2 text-center">Admin Sign In</h1>
             <p class="text-sm text-gray-500 mb-6 text-center">
-                Use your administrator credentials to access the attendance dashboard.
+                Use your administrator credentials to access the dashboard.
             </p>
 
             @if ($errors->any())
@@ -46,25 +46,21 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('login.perform') }}" class="space-y-5" novalidate>
+            <form method="POST" action="{{ route('admin.login.perform') }}" class="space-y-5" novalidate>
                 @csrf
 
                 <div class="space-y-1">
-                    <label for="identifier" class="block text-sm font-medium text-gray-700">Email or Employee ID</label>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email address</label>
                     <input
-                        id="identifier"
-                        name="identifier"
-                        type="text"
-                        value="{{ old('identifier') }}"
+                        id="email"
+                        name="email"
+                        type="email"
+                        value="{{ old('email') }}"
                         required
-                        autocomplete="username"
-                        class="mt-1 block w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-gray-300 transition-colors"
-                        placeholder="admin@devnosol.com or DEVNO-20"
+                        autocomplete="email"
+                        class="mt-1 block w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                        placeholder="admin@devnosol.com"
                     >
-                    <p class="mt-1 text-xs text-gray-500">
-                        Admin: Use your email address<br>
-                        Employee: Use DEVNO-{your-id} format
-                    </p>
                 </div>
 
                 <div class="space-y-1">
@@ -76,7 +72,7 @@
                         required
                         minlength="8"
                         autocomplete="current-password"
-                        class="mt-1 block w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 focus:border-gray-300 transition-colors"
+                        class="mt-1 block w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
                         placeholder="Enter your password"
                     >
                 </div>
@@ -94,7 +90,7 @@
                         </label>
                     </div>
                     <span class="text-xs text-gray-400">
-                        Secure login • No password reset
+                        Secure login
                     </span>
                 </div>
 
@@ -107,6 +103,12 @@
                     </button>
                 </div>
             </form>
+
+            <div class="mt-6 text-center">
+                <a href="{{ route('employee.login') }}" class="text-sm text-indigo-600 hover:text-indigo-800">
+                    Employee Login →
+                </a>
+            </div>
         </div>
 
         <p class="mt-6 text-center text-xs text-gray-400">
@@ -115,4 +117,3 @@
     </div>
 </body>
 </html>
-

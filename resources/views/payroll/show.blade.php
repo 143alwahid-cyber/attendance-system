@@ -5,24 +5,54 @@
 
 @section('content')
 <div class="max-w-6xl mx-auto">
-    <div class="mb-4 flex items-center justify-end gap-4">
+    <div class="mb-4 flex items-center justify-between gap-4">
         @if (session('error'))
             <div class="flex-1 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 <strong>Error:</strong> {{ session('error') }}
             </div>
         @endif
-        <form method="GET" action="{{ url('/payroll/export') }}" style="display: inline;">
-            <input type="hidden" name="employee_id" value="{{ $employee->id }}">
-            <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
-            <input type="hidden" name="overtime_minutes" value="{{ $payroll['overtime_minutes'] }}">
-            <input type="hidden" name="compensation" value="{{ $payroll['compensation'] }}">
-            <button
-                type="submit"
-                class="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none"
-            >
-                Export PDF
-            </button>
-        </form>
+        <div class="flex items-center gap-3 ml-auto">
+            @if(isset($savedPayroll) && $savedPayroll)
+                <a
+                    href="{{ route('payroll.saved') }}"
+                    class="inline-flex items-center rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700 focus:outline-none"
+                >
+                    ← Back to Saved Payrolls
+                </a>
+                <a
+                    href="{{ route('payroll.download-saved', $savedPayroll) }}"
+                    class="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none"
+                >
+                    Download PDF
+                </a>
+            @else
+                <form method="POST" action="{{ route('payroll.save') }}" style="display: inline;">
+                    @csrf
+                    <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                    <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+                    <input type="hidden" name="overtime_minutes" value="{{ $payroll['overtime_minutes'] }}">
+                    <input type="hidden" name="compensation" value="{{ $payroll['compensation'] }}">
+                    <button
+                        type="submit"
+                        class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none"
+                    >
+                        Save Payroll
+                    </button>
+                </form>
+                <form method="GET" action="{{ url('/payroll/export') }}" style="display: inline;">
+                    <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                    <input type="hidden" name="month" value="{{ $month->format('Y-m') }}">
+                    <input type="hidden" name="overtime_minutes" value="{{ $payroll['overtime_minutes'] }}">
+                    <input type="hidden" name="compensation" value="{{ $payroll['compensation'] }}">
+                    <button
+                        type="submit"
+                        class="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none"
+                    >
+                        Export PDF
+                    </button>
+                </form>
+            @endif
+        </div>
     </div>
 
     <!-- Payroll Header -->
