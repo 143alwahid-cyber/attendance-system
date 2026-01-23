@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Leave;
+use App\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -116,5 +117,130 @@ class LeaveController extends Controller
         return redirect()
             ->route('employee.leaves.index')
             ->with('success', 'Leave request submitted successfully!');
+    }
+
+    /**
+     * Admin: Display a listing of all leaves.
+     */
+    public function adminIndex(Request $request): View
+    {
+        // Get filter parameters
+        $statusFilter = $request->input('status', 'all');
+        $employeeFilter = $request->input('employee_id', 'all');
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        $leaveFormatFilter = $request->input('leave_format', 'all');
+        $sortOrder = $request->input('sort', 'desc');
+
+        // Build query
+        $query = Leave::with('employee')
+            ->orderBy('created_at', $sortOrder)
+            ->orderBy('leave_date', $sortOrder);
+
+        // Apply filters
+        if ($statusFilter !== 'all') {
+            $query->where('status', $statusFilter);
+        }
+
+        if ($employeeFilter !== 'all') {
+            $query->where('employee_id', $employeeFilter);
+        }
+
+        if ($leaveFormatFilter !== 'all') {
+            $query->where('leave_format', $leaveFormatFilter);
+        }
+
+        if ($dateFrom) {
+            $query->where('leave_date', '>=', Carbon::parse($dateFrom));
+        }
+
+        if ($dateTo) {
+            $query->where('leave_date', '<=', Carbon::parse($dateTo));
+        }
+
+        $leaves = $query->paginate(20)->withQueryString();
+
+        // Get all employees for filter dropdown
+        $employees = Employee::orderBy('name')->get();
+
+        // Calculate statistics
+        $stats = [
+            'total' => Leave::count(),
+            'pending' => Leave::where('status', 'pending')->count(),
+            'approved' => Leave::where('status', 'approved')->count(),
+            'rejected' => Leave::where('status', 'rejected')->count(),
+            'total_days' => Leave::where('status', 'approved')->sum('number_of_days'),
+        ];
+
+        return view('admin.leaves.index', compact(
+            'leaves',
+            'employees',
+            'stats',
+            'statusFilter',
+            'employeeFilter',
+            'dateFrom',
+            'dateTo',
+            'leaveFormatFilter',
+            'sortOrder'
+        ));
+    }
+
+    /**
+     * Admin: Show details of a specific leave.
+     */
+    public function show(Leave $leave): View
+    {
+        $leave->load('employee');
+        return view('admin.leaves.show', compact('leave'));
+    }
+
+    /**
+     * Admin: Approve a leave request.
+     */
+    public function approve(Leave $leave): RedirectResponse
+    {
+        if ($leave->status !== 'pending') {
+            return redirect()
+                ->route('admin.leaves.index')
+                ->with('error', 'This leave request has already been processed.');
+        }
+
+        $leave->update([
+            'status' => 'approved',
+            'approved_at' => now(),
+            'rejected_at' => null,
+            'rejection_reason' => null,
+        ]);
+
+        return redirect()
+            ->route('admin.leaves.index')
+            ->with('success', 'Leave request approved successfully!');
+    }
+
+    /**
+     * Admin: Reject a leave request.
+     */
+    public function reject(Request $request, Leave $leave): RedirectResponse
+    {
+        if ($leave->status !== 'pending') {
+            return redirect()
+                ->route('admin.leaves.index')
+                ->with('error', 'This leave request has already been processed.');
+        }
+
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        $leave->update([
+            'status' => 'rejected',
+            'rejected_at' => now(),
+            'approved_at' => null,
+            'rejection_reason' => $validated['rejection_reason'],
+        ]);
+
+        return redirect()
+            ->route('admin.leaves.index')
+            ->with('success', 'Leave request rejected successfully!');
     }
 }

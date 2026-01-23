@@ -71,6 +71,19 @@ Route::middleware(['auth:web', 'admin'])->group(function () {
 
     Route::get('/api/weather', [WeatherController::class, 'getWeather'])
         ->name('weather.get');
+
+    // Admin leave management routes
+    Route::get('/leaves', [LeaveController::class, 'adminIndex'])
+        ->name('admin.leaves.index');
+
+    Route::get('/leaves/{leave}', [LeaveController::class, 'show'])
+        ->name('admin.leaves.show');
+
+    Route::post('/leaves/{leave}/approve', [LeaveController::class, 'approve'])
+        ->name('admin.leaves.approve');
+
+    Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])
+        ->name('admin.leaves.reject');
 });
 
 // Employee routes (requires employee authentication)

@@ -58,6 +58,16 @@
                         Attendance
                     </a>
 
+                    <a
+                        href="{{ route('admin.leaves.index') }}"
+                        class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors {{ request()->routeIs('admin.leaves.*') ? 'bg-indigo-700 text-white' : 'text-indigo-200 hover:bg-indigo-700/50 hover:text-white' }}"
+                    >
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Leave Management
+                    </a>
+
                     @php
                         $isPayrollActive = request()->routeIs('payroll.*');
                         $isGenerateActive = request()->routeIs('payroll.index') || request()->routeIs('payroll.generate') || request()->routeIs('payroll.show');
