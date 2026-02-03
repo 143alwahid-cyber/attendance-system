@@ -458,6 +458,7 @@ class AttendanceController extends Controller
 
         $skippedNoEmployee = 0;
         $skippedDuplicate = 0;
+        $skippedInvalidDate = 0;
         $toInsert = [];
 
         // Records with employee_id and their occurrence range for a single batched existence check
@@ -492,7 +493,12 @@ class AttendanceController extends Controller
                 continue;
             }
 
-            $occurredAt = Carbon::parse($record['occurred_at']);
+            // Use same CSV date logic (12h AM/PM or 24h m/d/y); fallback to parse for already-normalized ISO
+            $occurredAt = $this->normalizeOccurredAt($record['occurred_at']);
+            if (! $occurredAt) {
+                $skippedInvalidDate++;
+                continue;
+            }
             $key = $record['employee_id'] . '|' . $record['status'] . '|' . $occurredAt->toDateTimeString();
 
             if (isset($existingSet[$key])) {
@@ -526,6 +532,9 @@ class AttendanceController extends Controller
         if ($skippedNoEmployee > 0) {
             $skipParts[] = "{$skippedNoEmployee} with no matching employee";
         }
+        if ($skippedInvalidDate > 0) {
+            $skipParts[] = "{$skippedInvalidDate} with invalid or unparseable date";
+        }
         if ($skippedDuplicate > 0) {
             $skipParts[] = "{$skippedDuplicate} already in the database (duplicates skipped)";
         }
@@ -536,6 +545,27 @@ class AttendanceController extends Controller
         return redirect()
             ->route('attendance.upload')
             ->with('status', $message);
+    }
+
+    /**
+     * Normalize occurred_at for DB save: use same format logic as CSV (12h AM/PM or 24h m/d/y),
+     * or parse ISO datetime if already normalized. Returns null if unparseable.
+     */
+    private function normalizeOccurredAt(string $value): ?Carbon
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        $carbon = $this->parseDateTimeCsv($value);
+        if ($carbon !== null) {
+            return $carbon;
+        }
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**
