@@ -291,6 +291,9 @@
                 <div class="document-info">
                     <div class="document-title">PAYROLL STATEMENT</div>
                     <div class="document-date">{{ $payroll['month_formatted'] }}</div>
+                    @if(!empty($payroll['perfect_attendance']))
+                        <div style="margin-top: 10px; padding: 8px 14px; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 9999px; font-size: 9pt; font-weight: 600; color: #92400e; text-align: center;">★ 100% Attendance — No Late Check-ins ★</div>
+                    @endif
                 </div>
             </div>
         </div>

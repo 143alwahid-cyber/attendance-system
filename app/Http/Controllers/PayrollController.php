@@ -431,6 +431,8 @@ class PayrollController extends Controller
         // Calculate net salary: gross - deductions - tax + overtime + compensation
         $netSalary = $employee->salary - $totalDeductions - $taxAmount + $overtimeAmount + $compensation;
         
+        $perfectAttendance = $workingDays > 0 && $absentDeductions == 0 && $lateDeductions == 0;
+
         return [
             'gross_salary' => $employee->salary,
             'working_days' => $workingDays,
@@ -446,6 +448,7 @@ class PayrollController extends Controller
             'net_salary' => $netSalary,
             'daily_details' => $dailyDetails,
             'month_formatted' => $month->format('F Y'),
+            'perfect_attendance' => $perfectAttendance,
         ];
     }
 
@@ -592,6 +595,8 @@ class PayrollController extends Controller
         $employee = $payroll->employee;
         $month = Carbon::parse($payroll->payroll_month);
 
+        $perfectAttendance = $payroll->working_days > 0 && $payroll->absent_deductions == 0 && $payroll->late_deductions == 0;
+
         // Convert saved payroll data to the format expected by the PDF view
         $payrollData = [
             'gross_salary' => $payroll->gross_salary,
@@ -608,6 +613,7 @@ class PayrollController extends Controller
             'net_salary' => $payroll->net_salary,
             'daily_details' => $payroll->daily_details,
             'month_formatted' => $month->format('F Y'),
+            'perfect_attendance' => $perfectAttendance,
         ];
 
         // Use dompdf for backend PDF generation
@@ -643,6 +649,8 @@ class PayrollController extends Controller
         $month = Carbon::parse($payroll->payroll_month);
         $savedPayroll = $payroll; // Keep the model instance
 
+        $perfectAttendance = $savedPayroll->working_days > 0 && $savedPayroll->absent_deductions == 0 && $savedPayroll->late_deductions == 0;
+
         // Convert saved payroll data to the format expected by the view
         $payroll = [
             'gross_salary' => $savedPayroll->gross_salary,
@@ -659,6 +667,7 @@ class PayrollController extends Controller
             'net_salary' => $savedPayroll->net_salary,
             'daily_details' => $savedPayroll->daily_details,
             'month_formatted' => $month->format('F Y'),
+            'perfect_attendance' => $perfectAttendance,
         ];
 
         return view('payroll.show', compact('employee', 'month', 'payroll', 'savedPayroll'));

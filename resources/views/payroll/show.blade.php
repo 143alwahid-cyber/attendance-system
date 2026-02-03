@@ -57,6 +57,15 @@
 
     <!-- Payroll Header -->
     <div class="bg-white shadow rounded-lg p-8 mb-6">
+        @if(!empty($payroll['perfect_attendance']))
+            <div class="mb-6 flex justify-center">
+                <div class="inline-flex items-center gap-2 rounded-full bg-amber-100 border-2 border-amber-400 px-5 py-2.5 shadow-sm">
+                    <span class="text-2xl" aria-hidden="true">⭐</span>
+                    <span class="text-sm font-semibold text-amber-800">100% Attendance — No Late Check-ins</span>
+                    <span class="text-2xl" aria-hidden="true">⭐</span>
+                </div>
+            </div>
+        @endif
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900">Payroll Statement</h1>
