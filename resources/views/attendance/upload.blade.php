@@ -8,7 +8,7 @@
     <div>
         <h1 class="text-2xl font-semibold text-gray-900">Upload Attendance File</h1>
         <p class="mt-1 text-sm text-gray-500">
-            Upload your attendance file (CSV recommended, or PDF). The system will parse rows by Employee ID (No. column), 
+            Upload your attendance file (CSV). The system will parse rows by Employee ID (No. column), 
             Status (checkin / checkout), and Date/Time, then let you review and save them into the database.
         </p>
     </div>
@@ -33,7 +33,7 @@
         <form method="POST" action="{{ route('attendance.preview') }}" enctype="multipart/form-data" class="space-y-4">
             @csrf
             <div class="space-y-1">
-                <label for="file" class="block text-sm font-medium text-gray-700">Attendance File (CSV or PDF)</label>
+                <label for="file" class="block text-sm font-medium text-gray-700">Attendance File (CSV)</label>
                 <input
                     id="file"
                     name="file"
@@ -43,8 +43,7 @@
                     class="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
                 >
                 <p class="text-xs text-gray-500 mt-1">
-                    <strong>CSV format (recommended):</strong> Upload a CSV file with columns: Employee ID (No.), Status (checkin/checkout), Date, and Time. 
-                    <strong>PDF format:</strong> Upload a PDF file up to 20 MB with the same column structure.
+                    
                 </p>
             </div>
 

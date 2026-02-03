@@ -25,7 +25,7 @@ class AttendanceController extends Controller
         ]);
     }
 
-    public function preview(Request $request, Parser $parser): View
+    public function preview(Request $request, Parser $parser): View|RedirectResponse
     {
         $data = $request->validate([
             'file' => ['required', 'file', 'mimes:pdf,csv,txt', 'max:20480'],
@@ -48,7 +48,7 @@ class AttendanceController extends Controller
         }
     }
     
-    private function parseCsv($file, Collection $employeeMap): View
+    private function parseCsv($file, Collection $employeeMap): View|RedirectResponse
     {
         try {
             $records = [];
@@ -167,8 +167,8 @@ class AttendanceController extends Controller
                     }
                 }
                 
-                // Parse date/time
-                $occurredAt = $this->parseDateTime($dateTimeString);
+                // Parse date/time — CSV must use m/d/y H:i (or m/d/Y H:i) only
+                $occurredAt = $this->parseDateTimeCsv($dateTimeString);
                 if (!$occurredAt) {
                     continue;
                 }
@@ -217,7 +217,7 @@ class AttendanceController extends Controller
         }
     }
     
-    private function parsePdf($file, Parser $parser, Collection $employeeMap): View
+    private function parsePdf($file, Parser $parser, Collection $employeeMap): View|RedirectResponse
     {
         try {
             $pdf = $parser->parseFile($file->getRealPath());
@@ -538,6 +538,42 @@ class AttendanceController extends Controller
             ->with('status', $message);
     }
 
+    /**
+     * Parse date/time from CSV uploads. Date/Time column may be:
+     * - 12-hour: 12/1/2025 7:05 PM  or  1/6/2026 9:30 AM
+     * - 24-hour: 1/6/2026 19:46  or  12/31/25 14:30
+     * Only these two styles are tried; format is chosen so the whole string is consumed (no trailing data).
+     */
+    private function parseDateTimeCsv(string $input): ?Carbon
+    {
+        $input = trim($input, " \t\n\r\0\x0B");
+        if ($input === '') {
+            return null;
+        }
+        // Extract date+time only so any trailing commas/newlines in the cell are ignored
+        if (!preg_match('/\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?/i', $input, $m)) {
+            return null;
+        }
+        $dateTimeString = trim($m[0], " \t\n\r\0\x0B");
+        $hasAmPm = preg_match('/\s+AM\s*$/i', $dateTimeString) || preg_match('/\s+PM\s*$/i', $dateTimeString);
+
+        if ($hasAmPm) {
+            // 12-hour: try formats that include AM/PM so entire string is consumed (no trailing data)
+            $formats = ['m/d/Y g:i A', 'm/d/y g:i A', 'm/d/Y h:i A', 'm/d/y h:i A', 'm/d/Y g:i:s A', 'm/d/y g:i:s A', 'm/d/Y h:i:s A', 'm/d/y h:i:s A'];
+        } else {
+            // 24-hour: try formats without AM/PM only
+            $formats = ['m/d/Y H:i', 'm/d/y H:i', 'm/d/Y H:i:s', 'm/d/y H:i:s'];
+        }
+
+        foreach ($formats as $format) {
+            $dt = Carbon::createFromFormat($format, $dateTimeString);
+            if ($dt !== false) {
+                return $dt;
+            }
+        }
+        return null;
+    }
+
     private function parseDateTime(string $input): ?Carbon
     {
         $input = trim($input);
@@ -546,7 +582,7 @@ class AttendanceController extends Controller
             return null;
         }
 
-        // Try formats with AM/PM first (common in CSV exports)
+        // Try formats with AM/PM first (common in PDF exports)
         $formats = [
             'm/d/Y g:i A',      // 12/12/2025 7:44 PM (12-hour with AM/PM, no leading zero on hour)
             'm/d/Y h:i A',      // 12/12/2025 07:44 PM (12-hour with AM/PM, with leading zero)
