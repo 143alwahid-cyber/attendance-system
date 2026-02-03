@@ -10,6 +10,7 @@ use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\EmployeeDashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\HolidayController;
 
 Route::redirect('/', '/admin/login');
 
@@ -84,6 +85,17 @@ Route::middleware(['auth:web', 'admin'])->group(function () {
 
     Route::post('/leaves/{leave}/reject', [LeaveController::class, 'reject'])
         ->name('admin.leaves.reject');
+
+    // Holiday management routes
+    Route::resource('holidays', HolidayController::class)
+        ->names([
+            'index' => 'admin.holidays.index',
+            'create' => 'admin.holidays.create',
+            'store' => 'admin.holidays.store',
+            'edit' => 'admin.holidays.edit',
+            'update' => 'admin.holidays.update',
+            'destroy' => 'admin.holidays.destroy',
+        ]);
 });
 
 // Employee routes (requires employee authentication)
@@ -112,6 +124,10 @@ Route::middleware('auth:employee')->group(function () {
 
     Route::post('/employee/leaves', [LeaveController::class, 'store'])
         ->name('employee.leaves.store');
+
+    // Holidays view for employees
+    Route::get('/employee/holidays', [HolidayController::class, 'employeeIndex'])
+        ->name('employee.holidays.index');
 
     // Weather API for employees
     Route::get('/api/weather', [WeatherController::class, 'getWeather'])

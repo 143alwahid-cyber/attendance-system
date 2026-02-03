@@ -60,6 +60,16 @@
                     </a>
 
                     <a
+                        href="{{ route('employee.holidays.index') }}"
+                        class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors {{ request()->routeIs('employee.holidays*') ? 'bg-indigo-700 text-white' : 'text-indigo-200 hover:bg-indigo-700/50 hover:text-white' }}"
+                    >
+                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2v7m0 0v5a2 2 0 11-4 0v-5m4 0h-4m0 0H8m4 0h4m-4-4a2 2 0 100-4 2 2 0 000 4z" />
+                        </svg>
+                        Holidays
+                    </a>
+
+                    <a
                         href="{{ route('employee.profile') }}"
                         class="flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors {{ request()->routeIs('employee.profile*') ? 'bg-indigo-700 text-white' : 'text-indigo-200 hover:bg-indigo-700/50 hover:text-white' }}"
                     >

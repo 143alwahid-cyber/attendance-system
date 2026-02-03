@@ -136,11 +136,13 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @foreach ($payroll['daily_details'] as $day)
-                        <tr class="{{ $day['has_leave'] ?? false ? 'bg-blue-50' : ($day['is_absent'] ? 'bg-red-50' : ($day['is_late'] ? 'bg-yellow-50' : '')) }}">
+                        <tr class="{{ isset($day['is_holiday']) && $day['is_holiday'] ? 'bg-purple-50' : (isset($day['has_leave']) && $day['has_leave'] ? 'bg-blue-50' : ($day['is_absent'] ? 'bg-red-50' : ($day['is_late'] ? 'bg-yellow-50' : ''))) }}">
                             <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $day['date_formatted'] }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">{{ $day['day_name'] }}</td>
                             <td class="px-4 py-3 text-sm text-gray-700">
-                                @if (isset($day['has_leave']) && $day['has_leave'])
+                                @if (isset($day['is_holiday']) && $day['is_holiday'])
+                                    <span class="text-purple-600">—</span>
+                                @elseif (isset($day['has_leave']) && $day['has_leave'])
                                     <span class="text-blue-600">—</span>
                                 @elseif ($day['checkin'])
                                     {{ $day['checkin'] }}
@@ -154,7 +156,9 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700">
-                                @if (isset($day['has_leave']) && $day['has_leave'])
+                                @if (isset($day['is_holiday']) && $day['is_holiday'])
+                                    <span class="text-purple-600">—</span>
+                                @elseif (isset($day['has_leave']) && $day['has_leave'])
                                     <span class="text-blue-600">—</span>
                                 @elseif ($day['checkout'])
                                     {{ $day['checkout'] }}
@@ -163,7 +167,14 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-sm">
-                                @if (isset($day['has_leave']) && $day['has_leave'])
+                                @if (isset($day['is_holiday']) && $day['is_holiday'])
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-purple-100 text-purple-800">
+                                        🎉 Holiday
+                                    </span>
+                                    @if (isset($day['holiday_name']))
+                                        <div class="text-xs text-purple-600 mt-1">{{ $day['holiday_name'] }}</div>
+                                    @endif
+                                @elseif (isset($day['has_leave']) && $day['has_leave'])
                                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
                                         Leave ({{ ucfirst($day['leave_type'] ?? 'full_day') }})
                                     </span>

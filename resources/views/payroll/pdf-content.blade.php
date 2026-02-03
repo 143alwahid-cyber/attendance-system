@@ -181,6 +181,9 @@
     tbody tr.leave {
         background: #eff6ff;
     }
+    tbody tr.holiday {
+        background: #faf5ff;
+    }
     td {
         padding: 10px 8px;
         color: #1a1a1a;
@@ -211,6 +214,10 @@
     .badge-leave {
         background: #dbeafe;
         color: #1e40af;
+    }
+    .badge-holiday {
+        background: #f3e8ff;
+        color: #7e22ce;
     }
     tfoot {
         background: #f3f4f6;
@@ -348,11 +355,13 @@
         </thead>
         <tbody>
             @foreach ($payroll['daily_details'] as $day)
-                <tr class="{{ isset($day['has_leave']) && $day['has_leave'] ? 'leave' : ($day['is_absent'] ? 'absent' : ($day['is_late'] ? 'late' : '')) }}">
+                <tr class="{{ isset($day['is_holiday']) && $day['is_holiday'] ? 'holiday' : (isset($day['has_leave']) && $day['has_leave'] ? 'leave' : ($day['is_absent'] ? 'absent' : ($day['is_late'] ? 'late' : ''))) }}">
                     <td>{{ $day['date_formatted'] }}</td>
                     <td>{{ $day['day_name'] }}</td>
                     <td>
-                        @if (isset($day['has_leave']) && $day['has_leave'])
+                        @if (isset($day['is_holiday']) && $day['is_holiday'])
+                            <span style="color: #9333ea;">—</span>
+                        @elseif (isset($day['has_leave']) && $day['has_leave'])
                             <span style="color: #2563eb;">—</span>
                         @else
                             {{ $day['checkin'] ?? '—' }}
@@ -362,14 +371,21 @@
                         @endif
                     </td>
                     <td>
-                        @if (isset($day['has_leave']) && $day['has_leave'])
+                        @if (isset($day['is_holiday']) && $day['is_holiday'])
+                            <span style="color: #9333ea;">—</span>
+                        @elseif (isset($day['has_leave']) && $day['has_leave'])
                             <span style="color: #2563eb;">—</span>
                         @else
                             {{ $day['checkout'] ?? '—' }}
                         @endif
                     </td>
                     <td>
-                        @if (isset($day['has_leave']) && $day['has_leave'])
+                        @if (isset($day['is_holiday']) && $day['is_holiday'])
+                            <span class="badge badge-holiday">Holiday</span>
+                            @if (isset($day['holiday_name']))
+                                <div style="font-size: 9px; color: #9333ea; margin-top: 2px;">{{ $day['holiday_name'] }}</div>
+                            @endif
+                        @elseif (isset($day['has_leave']) && $day['has_leave'])
                             <span class="badge badge-leave">Leave ({{ ucfirst($day['leave_type'] ?? 'full_day') }})</span>
                             @if (isset($day['leave_format']))
                                 <div style="font-size: 9px; color: #2563eb; margin-top: 2px;">{{ ucfirst($day['leave_format']) }}</div>

@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\Attendance;
 use App\Models\Payroll as PayrollModel;
 use App\Models\Leave;
+use App\Models\Holiday;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -180,6 +181,32 @@ class PayrollController extends Controller
                 return $leave->leave_date->format('Y-m-d');
             });
         
+        // Get all holidays that might overlap with the month (including recurring ones)
+        $holidays = Holiday::where(function ($query) use ($startDate, $endDate) {
+            // One-time holidays that overlap with the date range
+            $query->where(function ($q) use ($startDate, $endDate) {
+                // Holiday starts before or during the month and ends during or after the month
+                $q->where('start_date', '<=', $endDate->format('Y-m-d'))
+                  ->where('end_date', '>=', $startDate->format('Y-m-d'))
+                  ->where('is_recurring', false);
+            });
+        })
+        ->orWhere(function ($query) use ($startDate) {
+            // Recurring holidays - check if they might fall in this month
+            $query->where('is_recurring', true)
+                  ->where(function ($q) use ($startDate) {
+                      // Check if start or end month matches the payroll month
+                      $q->whereRaw('EXTRACT(MONTH FROM start_date) = ?', [$startDate->month])
+                        ->orWhereRaw('EXTRACT(MONTH FROM end_date) = ?', [$startDate->month])
+                        ->orWhere(function ($subQ) use ($startDate) {
+                            // Handle holidays that span across months
+                            $subQ->whereRaw('EXTRACT(MONTH FROM start_date) < ?', [$startDate->month])
+                                 ->whereRaw('EXTRACT(MONTH FROM end_date) > ?', [$startDate->month]);
+                        });
+                  });
+        })
+        ->get();
+        
         // Calculate salary per minute: Salary / 22 / 9 / 60
         $salaryPerMinute = $employee->salary / 22 / 9 / 60;
         $salaryPerDay = $employee->salary / 22;
@@ -202,14 +229,32 @@ class PayrollController extends Controller
             }
         }
         
-        // Calculate working days (excluding weekends - Saturday=6, Sunday=0)
+        // Calculate working days (excluding weekends and holidays)
         $workingDays = 0;
         $currentDate = $startDate->copy();
         while ($currentDate <= $endDate) {
             $dayOfWeek = $currentDate->dayOfWeek;
-            if ($dayOfWeek != Carbon::SATURDAY && $dayOfWeek != Carbon::SUNDAY) {
+            $dateKey = $currentDate->format('Y-m-d');
+            
+            // Check if it's a weekend
+            if ($dayOfWeek == Carbon::SATURDAY || $dayOfWeek == Carbon::SUNDAY) {
+                $currentDate->addDay();
+                continue;
+            }
+            
+            // Check if it's a holiday - check if date falls within any holiday range
+            $isHoliday = false;
+            foreach ($holidays as $holiday) {
+                if ($holiday->includesDate($currentDate)) {
+                    $isHoliday = true;
+                    break;
+                }
+            }
+            
+            if (!$isHoliday) {
                 $workingDays++;
             }
+            
             $currentDate->addDay();
         }
         
@@ -230,8 +275,44 @@ class PayrollController extends Controller
                 continue;
             }
             
+            // Check if it's a holiday - check if date falls within any holiday range
+            $isHoliday = false;
+            $holidayName = null;
+            foreach ($holidays as $holiday) {
+                if ($holiday->includesDate($currentDate)) {
+                    $isHoliday = true;
+                    $holidayName = $holiday->name;
+                    break;
+                }
+            }
+            
+            if ($isHoliday) {
+                // Add holiday to daily details but skip deduction logic
+                $dailyDetails[] = [
+                    'date' => $currentDate->copy(),
+                    'date_formatted' => $currentDate->format('M d, Y'),
+                    'day_name' => $currentDate->format('l'),
+                    'checkin' => null,
+                    'checkout' => null,
+                    'is_absent' => false,
+                    'is_late' => false,
+                    'late_minutes' => 0,
+                    'deduction' => 0,
+                    'has_leave' => false,
+                    'leave_type' => null,
+                    'leave_format' => null,
+                    'is_holiday' => true,
+                    'holiday_name' => $holidayName,
+                ];
+                $currentDate->addDay();
+                continue;
+            }
+            
             $checkin = $attendanceByDate[$dateKey]['checkin'] ?? null;
             $checkout = $attendanceByDate[$dateKey]['checkout'] ?? null;
+            
+            // Check if it's a holiday (shouldn't reach here, but keeping for safety)
+            $holidayName = null;
             
             // Check if there's an approved leave for this date
             $approvedLeave = $approvedLeaves->get($dateKey);
@@ -334,6 +415,8 @@ class PayrollController extends Controller
                 'has_leave' => $approvedLeave !== null,
                 'leave_type' => $approvedLeave ? $approvedLeave->leave_type : null,
                 'leave_format' => $leaveFormat,
+                'is_holiday' => false,
+                'holiday_name' => null,
             ];
             
             $currentDate->addDay();

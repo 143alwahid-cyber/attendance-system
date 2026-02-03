@@ -314,7 +314,12 @@
                             $shouldDisplay = true;
                             if ($statusFilter !== 'all' && !$isWeekend) {
                                 $hasLeave = isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'];
-                                if ($statusFilter === 'present' && !$hasLeave && (!$dayAttendance || (!$dayAttendance['checkin'] && !$dayAttendance['checkout']))) {
+                                $isHoliday = isset($dayAttendance['is_holiday']) && $dayAttendance['is_holiday'];
+                                
+                                // Holidays are always displayed
+                                if ($isHoliday) {
+                                    $shouldDisplay = true;
+                                } elseif ($statusFilter === 'present' && !$hasLeave && (!$dayAttendance || (!$dayAttendance['checkin'] && !$dayAttendance['checkout']))) {
                                     $shouldDisplay = false;
                                 } elseif ($statusFilter === 'absent' && !$hasLeave && $dayAttendance && ($dayAttendance['checkin'] || $dayAttendance['checkout'])) {
                                     $shouldDisplay = false;
@@ -331,7 +336,14 @@
                                     <div class="text-xs text-gray-500">{{ $currentDate->format('l') }}</div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    @if(isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'])
+                                    @if(isset($dayAttendance['is_holiday']) && $dayAttendance['is_holiday'])
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                            🎉 Holiday
+                                        </span>
+                                        @if(isset($dayAttendance['holiday_name']))
+                                            <div class="text-xs text-purple-600 mt-1">{{ $dayAttendance['holiday_name'] }}</div>
+                                        @endif
+                                    @elseif(isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'])
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                             Leave ({{ ucfirst($dayAttendance['leave_type'] ?? 'full_day') }})
                                         </span>
@@ -372,7 +384,9 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    @if(isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'])
+                                    @if(isset($dayAttendance['is_holiday']) && $dayAttendance['is_holiday'])
+                                        <span class="text-xs text-purple-600">Public Holiday</span>
+                                    @elseif(isset($dayAttendance['has_leave']) && $dayAttendance['has_leave'])
                                         <span class="text-xs text-blue-600">Approved Leave</span>
                                     @elseif($dayAttendance && $dayAttendance['late'])
                                         <span class="text-xs text-yellow-600">Late arrival</span>
