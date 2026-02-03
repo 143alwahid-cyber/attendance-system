@@ -155,6 +155,7 @@
                         <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source File</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded At</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -218,10 +219,32 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-500">{{ $attendance->created_at->format('M d, Y g:i A') }}</div>
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button
+                                        type="button"
+                                        class="edit-time-btn inline-flex items-center rounded-md bg-indigo-100 px-2.5 py-1.5 text-xs font-medium text-indigo-800 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                                        data-update-url="{{ route('attendance.update-time', $attendance) }}"
+                                        data-date="{{ $attendance->occurred_at->format('Y-m-d') }}"
+                                        data-time="{{ $attendance->occurred_at->format('H:i') }}"
+                                        data-label="{{ $attendance->employee?->name }} — {{ $attendance->status === 'checkin' ? 'Check In' : 'Check Out' }} ({{ $attendance->occurred_at->format('M d, Y g:i A') }})"
+                                    >
+                                        Change time
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="view-logs-btn inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1"
+                                        data-logs-url="{{ route('attendance.edit-logs', $attendance) }}"
+                                        data-label="{{ $attendance->employee?->name }} — {{ $attendance->occurred_at->format('M d, Y g:i A') }}"
+                                    >
+                                        View edit logs
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            <td colspan="7" class="px-6 py-8 text-center text-gray-500">
                                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
@@ -241,5 +264,111 @@
             </div>
         @endif
     </div>
+
+    <!-- Edit Time Modal -->
+    <div id="editTimeModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="edit-time-title" role="dialog" aria-modal="true">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" data-edit-modal-backdrop></div>
+            <div class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+                <h3 id="edit-time-title" class="text-lg font-semibold text-gray-900 mb-2">Change time</h3>
+                <p id="edit-time-label" class="text-sm text-gray-500 mb-4"></p>
+                <form id="editTimeForm" method="POST" action="">
+                    @csrf
+                    @method('PATCH')
+                    @foreach(request()->only(['employee_id', 'status', 'date_from', 'date_to', 'source_file', 'page']) as $key => $value)
+                        @if($value !== null && $value !== '')
+                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                        @endif
+                    @endforeach
+                    <div class="space-y-4">
+                        <div>
+                            <label for="occurred_at_date" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                            <input type="date" id="occurred_at_date" name="occurred_at_date" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label for="occurred_at_time" class="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                            <input type="time" id="occurred_at_time" name="occurred_at_time" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" step="60">
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-2">
+                        <button type="button" class="edit-time-cancel inline-flex rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300" data-edit-modal-cancel>Cancel</button>
+                        <button type="submit" class="inline-flex rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Logs Modal -->
+    <div id="editLogsModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="edit-logs-title" role="dialog" aria-modal="true">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" data-logs-modal-backdrop></div>
+            <div class="relative bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col p-6">
+                <h3 id="edit-logs-title" class="text-lg font-semibold text-gray-900 mb-2">Edit logs</h3>
+                <p id="edit-logs-label" class="text-sm text-gray-500 mb-4"></p>
+                <div id="edit-logs-content" class="flex-1 overflow-y-auto min-h-0 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <p class="text-sm text-gray-400">Loading…</p>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button type="button" class="logs-modal-close inline-flex rounded-md bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300" data-logs-modal-close>Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            var editModal = document.getElementById('editTimeModal');
+            var editForm = document.getElementById('editTimeForm');
+            var editLabel = document.getElementById('edit-time-label');
+            var editBackdrop = document.querySelector('[data-edit-modal-backdrop]');
+            var editCancel = document.querySelector('[data-edit-modal-cancel]');
+
+            document.querySelectorAll('.edit-time-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    editForm.action = this.getAttribute('data-update-url');
+                    document.getElementById('occurred_at_date').value = this.getAttribute('data-date');
+                    document.getElementById('occurred_at_time').value = this.getAttribute('data-time');
+                    editLabel.textContent = this.getAttribute('data-label');
+                    editModal.classList.remove('hidden');
+                });
+            });
+
+            function closeEditModal() {
+                editModal.classList.add('hidden');
+            }
+            if (editBackdrop) editBackdrop.addEventListener('click', closeEditModal);
+            if (editCancel) editCancel.addEventListener('click', closeEditModal);
+
+            var logsModal = document.getElementById('editLogsModal');
+            var logsContent = document.getElementById('edit-logs-content');
+            var logsLabel = document.getElementById('edit-logs-label');
+            var logsBackdrop = document.querySelector('[data-logs-modal-backdrop]');
+            var logsClose = document.querySelector('[data-logs-modal-close]');
+
+            document.querySelectorAll('.view-logs-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var url = this.getAttribute('data-logs-url');
+                    logsLabel.textContent = this.getAttribute('data-label');
+                    logsContent.innerHTML = '<p class="text-sm text-gray-400">Loading…</p>';
+                    logsModal.classList.remove('hidden');
+                    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' } })
+                        .then(function(r) { return r.text(); })
+                        .then(function(html) {
+                            logsContent.innerHTML = html;
+                        })
+                        .catch(function() {
+                            logsContent.innerHTML = '<p class="text-sm text-red-600">Failed to load logs.</p>';
+                        });
+                });
+            });
+
+            function closeLogsModal() {
+                logsModal.classList.add('hidden');
+            }
+            if (logsBackdrop) logsBackdrop.addEventListener('click', closeLogsModal);
+            if (logsClose) logsClose.addEventListener('click', closeLogsModal);
+        })();
+    </script>
 </div>
 @endsection

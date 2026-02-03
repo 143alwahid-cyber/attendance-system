@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\AttendanceEditLog;
 use App\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Illuminate\View\View;
 use Smalot\PdfParser\Parser;
@@ -694,5 +696,50 @@ class AttendanceController extends Controller
             ->values();
         
         return view('attendance.index', compact('attendances', 'employees', 'sourceFiles', 'totalCount', 'checkinCount', 'checkoutCount'));
+    }
+
+    /**
+     * Update check-in/check-out time of an attendance record (admin only). Logs the edit.
+     */
+    public function updateTime(Request $request, Attendance $attendance): RedirectResponse
+    {
+        $request->validate([
+            'occurred_at_date' => ['required', 'date'],
+            'occurred_at_time' => ['required', 'date_format:H:i'],
+        ]);
+
+        $newOccurredAt = Carbon::parse($request->occurred_at_date . ' ' . $request->occurred_at_time);
+        $oldOccurredAt = Carbon::parse($attendance->occurred_at);
+
+        if ($newOccurredAt->eq($oldOccurredAt)) {
+            return redirect()
+                ->route('attendance.index', $request->only(['employee_id', 'status', 'date_from', 'date_to', 'source_file', 'page']))
+                ->with('status', 'No change: time is the same.');
+        }
+
+        $oldValue = $oldOccurredAt->toDateTimeString();
+        $attendance->occurred_at = $newOccurredAt;
+        $attendance->save();
+
+        AttendanceEditLog::create([
+            'attendance_id' => $attendance->id,
+            'edited_by' => Auth::id(),
+            'field' => 'occurred_at',
+            'old_value' => $oldValue,
+            'new_value' => $newOccurredAt->toDateTimeString(),
+        ]);
+
+        return redirect()
+            ->route('attendance.index', $request->only(['employee_id', 'status', 'date_from', 'date_to', 'source_file', 'page']))
+            ->with('status', 'Attendance time updated. Status (e.g. Late) is based on the new time.');
+    }
+
+    /**
+     * Return edit logs for an attendance record (for modal, admin only).
+     */
+    public function editLogs(Attendance $attendance): View
+    {
+        $logs = $attendance->editLogs()->with('editor')->get();
+        return view('attendance.partials.edit-logs', compact('attendance', 'logs'));
     }
 }
