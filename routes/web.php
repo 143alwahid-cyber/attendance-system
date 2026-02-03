@@ -49,6 +49,12 @@ Route::middleware(['auth:web', 'admin'])->group(function () {
     Route::post('/attendance/store', [AttendanceController::class, 'storeFromPreview'])
         ->name('attendance.store');
 
+    Route::patch('/attendance/{attendance}/time', [AttendanceController::class, 'updateTime'])
+        ->name('attendance.update-time');
+
+    Route::get('/attendance/{attendance}/edit-logs', [AttendanceController::class, 'editLogs'])
+        ->name('attendance.edit-logs');
+
     Route::get('/payroll', [PayrollController::class, 'index'])
         ->name('payroll.index');
 
